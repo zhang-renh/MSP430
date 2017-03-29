@@ -75,6 +75,21 @@ const unsigned int music_data[][2] =
 	{659,200},{587,200},{659,200},{587,200},{523,800},
 	{587,200},{587,400},{523,200},{587,200},{587,400},{659,200},
 	{587,200},{523,200},{440,200},{587,200},{523,800},
+	{523,200},{523,400},{440,200},{392,400},{440,400},
+	{523,200},{523,400},{587,200},{659,800},
+	{587,200},{587,400},{523,200},{587,400},{587,200},{784,200},
+	{784,200},{659,200},{659,200},{587,200},{659,800},
+	{523,200},{523,200},{523,200},{440,200},{392,400},{784,400},
+	{659,200},{587,200},{659,200},{587,200},{523,800},
+	{587,200},{587,400},{523,200},{587,200},{587,400},{659,200},
+	{587,200},{523,200},{440,200},{587,200},{523,800},
+	{659,200},{784,400},{784,200},{784,400},{784,400},
+	{880,200},{784,200},{659,200},{587,200},{523,800},
+	{880,200},{1047,200},{880,200},{784,200},{659,200},{587,200},{523,200},{440,200},
+	{587,400},{587,200},{659,200},{659,200},{587,600},
+	{659,200},{784,400},{784,200},{784,400},{784,400},
+	{880,200},{784,200},{659,200},{587,200},{523,800},
+	{440,200},{523,200},{440,200},{393,200},{587,400},{659,400},{523,1200},{0,400},
 	//------------------
 	{0,0}
 }
@@ -91,7 +106,9 @@ void Init_Ports(void)
 	P2DIR |= BIT7 + BIT6 + BIT5; //P2.5、P2.6、P2.7 设置为输出
 	  //本电路板中三者用于连接显示和键盘管理器TM1638，工作原理详见其DATASHEET
 	  //将4路GPIO引脚P1.0,P1.1,P1.2,P1.3设置为输出
-	  P1DIR |= BIT0 + BIT1 + BIT2 + BIT3;
+	P1DIR |= BIT0 + BIT1 + BIT2 + BIT3;
+	P2SEL |= BIT1;
+	P2DIR |= BIT1;
  }
 
 //  定时器TIMER0初始化，循环定时20ms
@@ -100,6 +117,14 @@ void Init_Timer0(void)
 	TA0CTL = TASSEL_2 + MC_1 ;      // Source: SMCLK=1MHz, UP mode,
 	TA0CCR0 = 20000;                // 1MHz时钟,计满20000次为 20ms
 	TA0CCTL0 = CCIE;                // TA0CCR0 interrupt enabled
+}
+
+void Init_Timer1(void)
+{
+    TA1CTL = TASSEL_2 + MC_1;
+    TA1CCTL1 = OUTMOD_7;
+    TA1CCR0 = 1000000/440;
+    TA1CCR1 = TA1CCR0/2;
 }
 
 //  MCU器件初始化，注：会调用上述函数
@@ -120,18 +145,9 @@ void Init_Devices(void)
 
     Init_Ports();           //调用函数，初始化I/O口
     Init_Timer0();          //调用函数，初始化定时器0
-    _BIS_SR(GIE);           //开全局中断
+    Init_Timer1();
+	_BIS_SR(GIE);           //开全局中断
    //all peripherals are now initialized
-   
-   //音乐播放
-   //初始化P2.1设置为定时器A1的PWM输出引脚
-   P2SEL |= BIT1;
-   P2DIR |= BIT1;
-   //初始化Timer1，产生440Hz的方波信号
-   TA1CTL = TASSEL_2 + MC_1; 
-   TA1CCRTL1 = OUTMOD_7;
-   TA1CCR0 = 1000000 / 440;
-   TA1CCR1 = TA1CCR0 / 2;
 }
 
 //////////////////////////////
@@ -189,34 +205,56 @@ __interrupt void Timer0_A0 (void)
 	//音乐播放
 	if(play == 1 & pause == 0)
 	{	
-		if(audio_dura == 0)		//一个节拍播放完毕
+		if (audio_frequency != 0)
+		{
+			TA1CCR0 = 1000000 / audio_frequency;
+			TA1CCR1 = TA1CCR0/2;
+			TA1CTL = TASSEL_2 + MC_1;
+		}
+		if(audio_dura == 0)		//一个节拍结束
 		{
 			TA1CTL = 0;
-			if (audio_ptr < music_time)//音乐还没结束,取下一个节拍
+			if (audio_ptr <= music_time)//音乐没有结束
 			{
 				audio_ptr ++;
 				audio_frequency = music_data[audio_ptr][0];
 				//休止符
-				if(audio_frequency == 0 & audio_ptr < music_time)
+				/*if(audio_frequency == 0 & audio_ptr < music_time)
 				{
 					audio_ptr++;
 					audio_frequency = music_data[audio_ptr][0];
+				}*/
+				audio_dura = music_data[audio_ptr][1]/20;
+				//不是休止符则输出
+				if(audio_frequency != 0)
+				{
+					TA1CCR0 = 1000000/audio_frequency;
+					TA1CCR1 = TA1CCR0/2;
+					TA1CTL = TASSEL_2 + MC_1;
 				}
-				audio_dura = music_data[audio_ptr][1] / 20;
-				TA1CCR0 = 1000000 / audio_frequency;
-				TA1CCR1 = TA1CCR0 / 2;
-				TA1CTL = TASSEL_2 + MC_1;
 			}
-			else	//音乐结束
+			else	//音乐播放结束
 			{
-				audio_dura = 0;
-				audio_frequency = 0;
+				audio_dura=0;
+				audio_frequency=0;
 				play = 0;
 				TA1CTL = 0;
 			}
 		}
 		else audio_dura --;
 	}
+	else if(play == 0)
+	{
+		audio_dura = 0;
+		audio_frequency = 0;
+		audio_ptr = 0;
+		TA1CTL = 0;
+	}
+	else 
+	{
+		TA1CTL = 0;
+	}
+	
 	
 	
 	// 检查当前键盘输入，0代表无键操作，1-16表示有对应按键
