@@ -58,7 +58,7 @@ unsigned int audio_frequency = 0,audio_dura = 0,audio_ptr = 0;
 unsigned int play = 0,pause = 0;	//0=false;1=true
 
 //乐曲《荷塘月色》的乐谱{频率值，节拍值} const类型指明要存放在程序存储器中
-const unsigned int music_time = 20;	//音乐长度，数组长度减一
+const unsigned int music_time = 140;	//音乐长度，数组长度减一
 const unsigned int music_data[][2] =
 {
 	{0.0}
