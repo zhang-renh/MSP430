@@ -1,4 +1,5 @@
-﻿//本程序时钟采用内部RC振荡器。     DCO：8MHz,供CPU时钟;  SMCLK：1MHz,供定时器时钟
+﻿//Author = ZRH
+//本程序时钟采用内部RC振荡器。     DCO：8MHz,供CPU时钟;  SMCLK：1MHz,供定时器时钟
 #include <msp430g2553.h>
 #include <tm1638.h>  //与TM1638有关的变量及函数定义均在该H文件中
 
